@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>bookfuckers</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+ <style>
+  body {
+    margin: 0;
+    font-family: Georgia, "Times New Roman", serif;
+    background: #f4efe6;
+    color: #3b2f2f;
+    padding: 15px;
+  }
+
+  h1 {
+    text-align: center;
+    margin-bottom: 5px;
+    font-size: 2em;
+  }
+
+  p.subtitle {
+    text-align: center;
+    margin-top: 0;
+    font-style: italic;
+    color: #6b5b53;
+  }
+
+  /* 📏 Center table and limit width */
+  table {
+    width: 66%;
+    margin: 20px auto;
+    border-collapse: collapse;
+    background: #fffdf8;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  th, td {
+    padding: 12px;
+    border-bottom: 1px solid #e6ded3;
+    text-align: center;
+    font-size: 1.05em;
+  }
+
+  th {
+    background: #5c4033;
+    color: white;
+    font-weight: normal;
+  }
+
+  tr:nth-child(even) { background: #f9f4ec; }
+
+  /* Center reader names now */
+  .reader-cell {
+    text-align: center;
+    font-weight: bold;
+  }
+
+  /* 📱 Mobile tweaks — keep table layout */
+  @media (max-width: 600px) {
+    table {
+      width: 95%;
+      font-size: 0.95em;
+    }
+
+    th, td {
+      padding: 10px 6px;
+    }
+  }
+</style>
+
+</head>
+<body>
+
+<h1>📚 bookfuckers</h1>
+<p class="subtitle">Who’s turning the most pages?</p>
+
+<table id="scoreboard"></table>
+
+<script>
+const url = "https://opensheet.elk.sh/1nwnbwGOc99BVsed4doQZvNfPgkNwC6bVA3FlXrLLHgg/Scoreboard";
+
+function parseScore(val) {
+  return parseFloat(String(val).replace(/,/g, "")) || 0;
+}
+
+function getMedal(i) {
+  return ["🥇","🥈","🥉"][i] || "";
+}
+
+async function loadScoreboard() {
+  const table = document.getElementById("scoreboard");
+  table.innerHTML = "<tr><td>Loading…</td></tr>";
+
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.length) throw "No data";
+
+    // 🔍 Find columns by NAME instead of position
+    const headers = Object.keys(data[0]);
+    const nameCol = headers.find(h => h.toLowerCase().includes("reader")) || headers[0];
+    const scoreCol = headers.find(h => h.toLowerCase().includes("score")) || headers[1];
+
+    data.sort((a,b) => parseScore(b[scoreCol]) - parseScore(a[scoreCol]));
+
+    let html = "<thead><tr>";
+    headers.forEach(h => html += `<th>${h}</th>`);
+    html += "</tr></thead><tbody>";
+
+    data.forEach((row,i) => {
+      html += "<tr>";
+      headers.forEach(h => {
+        let val = row[h] ?? "";
+
+        if (h === nameCol) {
+          val = `${getMedal(i)} ${val}`;
+          html += `<td class="reader-cell" data-label="${h}">${val}</td>`;
+        } else {
+          html += `<td data-label="${h}">${val}</td>`;
+        }
+      });
+      html += "</tr>";
+    });
+
+    html += "</tbody>";
+    table.innerHTML = html;
+
+  } catch (err) {
+    table.innerHTML = "<tr><td>Error loading scoreboard</td></tr>";
+    console.error(err);
+  }
+}
+
+loadScoreboard();
+setInterval(loadScoreboard, 30000);
+</script>
+
+</body>
+</html>
+
