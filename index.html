@@ -26,7 +26,6 @@
     color: #6b5b53;
   }
 
-  /* 📏 Center table and limit width */
   table {
     width: 66%;
     margin: 20px auto;
@@ -52,13 +51,20 @@
 
   tr:nth-child(even) { background: #f9f4ec; }
 
-  /* Center reader names now */
   .reader-cell {
     text-align: center;
     font-weight: bold;
   }
 
-  /* 📱 Mobile tweaks — keep table layout */
+  .book-cell {
+    text-align: center;
+    min-width: 260px;
+  }
+
+  .book-title {
+    font-style: italic;
+  }
+
   @media (max-width: 600px) {
     table {
       width: 95%;
@@ -67,6 +73,10 @@
 
     th, td {
       padding: 10px 6px;
+    }
+
+    .book-cell {
+      min-width: auto;
     }
   }
 </style>
@@ -79,7 +89,11 @@
 <table id="scoreboard"></table>
 
 <script>
-const url = "https://opensheet.elk.sh/1nwnbwGOc99BVsed4doQZvNfPgkNwC6bVA3FlXrLLHgg/Scoreboard";
+const scoreboardUrl =
+  "https://opensheet.elk.sh/1nwnbwGOc99BVsed4doQZvNfPgkNwC6bVA3FlXrLLHgg/Scoreboard";
+
+const booksUrl =
+  "https://opensheet.elk.sh/1nwnbwGOc99BVsed4doQZvNfPgkNwC6bVA3FlXrLLHgg/Books!";
 
 function parseScore(val) {
   return parseFloat(String(val).replace(/,/g, "")) || 0;
@@ -89,38 +103,104 @@ function getMedal(i) {
   return ["🥇","🥈","🥉"][i] || "";
 }
 
+function escapeHtml(str) {
+  return String(str || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function getLatestBooks(books) {
+  const latest = {};
+
+  books.forEach(book => {
+    const reader = book["Who are you?"];
+    if (!reader) return;
+
+    const timestamp = new Date(book["Timestamp"]);
+
+    if (!latest[reader] || timestamp > latest[reader].timestamp) {
+      latest[reader] = {
+        timestamp,
+        title: book["Title"] || "",
+        author: book["Author"] || ""
+      };
+    }
+  });
+
+  return latest;
+}
+
 async function loadScoreboard() {
   const table = document.getElementById("scoreboard");
   table.innerHTML = "<tr><td>Loading…</td></tr>";
 
   try {
-    const res = await fetch(url);
-    const data = await res.json();
-    if (!data.length) throw "No data";
+    const [scoreboardRes, booksRes] = await Promise.all([
+      fetch(scoreboardUrl),
+      fetch(booksUrl)
+    ]);
 
-    // 🔍 Find columns by NAME instead of position
-    const headers = Object.keys(data[0]);
-    const nameCol = headers.find(h => h.toLowerCase().includes("reader")) || headers[0];
-    const scoreCol = headers.find(h => h.toLowerCase().includes("score")) || headers[1];
+    const scoreboard = await scoreboardRes.json();
+    const books = await booksRes.json();
 
-    data.sort((a,b) => parseScore(b[scoreCol]) - parseScore(a[scoreCol]));
+    const latestBooks = getLatestBooks(books);
+
+    const headers = Object.keys(scoreboard[0]);
+
+    const nameCol =
+      headers.find(h => h.toLowerCase().includes("reader")) ||
+      headers[0];
+
+    const scoreCol =
+      headers.find(h => h.toLowerCase().includes("score")) ||
+      headers[1];
+
+    scoreboard.sort(
+      (a, b) =>
+        parseScore(b[scoreCol]) - parseScore(a[scoreCol])
+    );
 
     let html = "<thead><tr>";
-    headers.forEach(h => html += `<th>${h}</th>`);
+
+    headers.forEach(h => {
+      html += `<th>${h}</th>`;
+    });
+
+    html += "<th>Latest Book</th>";
     html += "</tr></thead><tbody>";
 
-    data.forEach((row,i) => {
+    scoreboard.forEach((row, i) => {
+      const reader = row[nameCol];
+
       html += "<tr>";
+
       headers.forEach(h => {
-        let val = row[h] ?? "";
+        let value = row[h] ?? "";
 
         if (h === nameCol) {
-          val = `${getMedal(i)} ${val}`;
-          html += `<td class="reader-cell" data-label="${h}">${val}</td>`;
+          value = `${getMedal(i)} ${value}`;
+          html += `<td class="reader-cell">${value}</td>`;
         } else {
-          html += `<td data-label="${h}">${val}</td>`;
+          html += `<td>${value}</td>`;
         }
       });
+
+      const latest = latestBooks[reader];
+
+      if (latest) {
+        html += `
+          <td class="book-cell">
+            <span class="book-title">${escapeHtml(latest.title)}</span>
+            by ${escapeHtml(latest.author)}
+          </td>
+        `;
+      } else {
+        html += `<td class="book-cell">—</td>`;
+      }
+
       html += "</tr>";
     });
 
@@ -136,11 +216,11 @@ async function loadScoreboard() {
 loadScoreboard();
 setInterval(loadScoreboard, 30000);
 </script>
+
 <p style="text-align:center; margin-top:30px; font-size:1.1em; font-style:italic;">
-  <a href="https://github.com/ben-foley/bookfuckerz/issues/new?template=feature_request.md" 
-     target="_blank" 
+  <a href="https://github.com/ben-foley/bookfuckerz/issues/new?template=feature_request.md"
+     target="_blank"
      style="text-decoration:none; color:#5c4033; display:inline-flex; align-items:center; gap:6px; font-style:italic;">
-    <!-- More recognizable lightbulb SVG -->
     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
       <path d="M2 6a6 6 0 1 1 12 0c0 2.1-1.22 3.875-3 5v1a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-1c-1.78-1.125-3-2.9-3-5z"/>
       <path d="M7 13h2v1H7v-1z"/>
@@ -152,7 +232,3 @@ setInterval(loadScoreboard, 30000);
 
 </body>
 </html>
-
-
-
-
